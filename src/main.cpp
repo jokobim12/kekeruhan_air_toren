@@ -32,6 +32,9 @@ int cleanThreshold = 1900;
 int cloudyThreshold = 1850;
 int dirtyThreshold = 1000;
 
+// ID Perangkat Unik (dicocokkan dengan hasil scan QR Code)
+const String DEVICE_ID = "masjid_al_jihad";
+
 void setup() {
   Serial.begin(115200);
 
@@ -61,7 +64,7 @@ void loop() {
     
     // 1. Baca delay
     int tempDelay = 0;
-    if (Firebase.RTDB.getInt(&fbdo, "/turbidity/settings/delay", &tempDelay)) {
+    if (Firebase.RTDB.getInt(&fbdo, "/devices/" + DEVICE_ID + "/settings/delay", &tempDelay)) {
       if (tempDelay > 0) {
         sendInterval = tempDelay * 1000; // Ubah detik ke milidetik
         Serial.print("Interval pengiriman diperbarui secara dinamis: ");
@@ -72,39 +75,39 @@ void loop() {
 
     // 2. Baca threshold bersih
     int tempClean = 0;
-    if (Firebase.RTDB.getInt(&fbdo, "/turbidity/thresholds/clean", &tempClean)) {
+    if (Firebase.RTDB.getInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/clean", &tempClean)) {
       cleanThreshold = tempClean;
       Serial.print("Batas BERSIH diperbarui: ");
       Serial.println(cleanThreshold);
     } else {
       // Tulis default jika belum ada di database
-      Firebase.RTDB.setInt(&fbdo, "/turbidity/thresholds/clean", cleanThreshold);
+      Firebase.RTDB.setInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/clean", cleanThreshold);
     }
 
     // 3. Baca threshold keruh
     int tempCloudy = 0;
-    if (Firebase.RTDB.getInt(&fbdo, "/turbidity/thresholds/cloudy", &tempCloudy)) {
+    if (Firebase.RTDB.getInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/cloudy", &tempCloudy)) {
       cloudyThreshold = tempCloudy;
       Serial.print("Batas KERUH diperbarui: ");
       Serial.println(cloudyThreshold);
     } else {
       // Tulis default jika belum ada di database
-      Firebase.RTDB.setInt(&fbdo, "/turbidity/thresholds/cloudy", cloudyThreshold);
+      Firebase.RTDB.setInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/cloudy", cloudyThreshold);
     }
 
     // 3b. Baca threshold kotor
     int tempDirty = 0;
-    if (Firebase.RTDB.getInt(&fbdo, "/turbidity/thresholds/dirty", &tempDirty)) {
+    if (Firebase.RTDB.getInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/dirty", &tempDirty)) {
       dirtyThreshold = tempDirty;
       Serial.print("Batas KOTOR diperbarui: ");
       Serial.println(dirtyThreshold);
     } else {
       // Tulis default jika belum ada di database
-      Firebase.RTDB.setInt(&fbdo, "/turbidity/thresholds/dirty", dirtyThreshold);
+      Firebase.RTDB.setInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/dirty", dirtyThreshold);
     }
 
     // 4. Kirim Wi-Fi SSID saat ini ke Firebase agar terbaca di halaman Profil Android
-    Firebase.RTDB.setString(&fbdo, "/turbidity/wifi_ssid", WiFi.SSID());
+    Firebase.RTDB.setString(&fbdo, "/devices/" + DEVICE_ID + "/wifi_ssid", WiFi.SSID());
   }
 
   // Kirim data setiap interval yang ditentukan
@@ -130,7 +133,7 @@ void loop() {
     Serial.println(status);
 
     // Kirim data nilai sensor ke Firebase RTDB
-    if (Firebase.RTDB.setInt(&fbdo, "/turbidity/value", sensorValue)) {
+    if (Firebase.RTDB.setInt(&fbdo, "/devices/" + DEVICE_ID + "/value", sensorValue)) {
       Serial.println("Berhasil mengirim nilai sensor ke Firebase");
     } else {
       Serial.print("Gagal mengirim nilai sensor: ");
@@ -138,7 +141,7 @@ void loop() {
     }
 
     // Kirim data status ke Firebase RTDB
-    if (Firebase.RTDB.setString(&fbdo, "/turbidity/status", status)) {
+    if (Firebase.RTDB.setString(&fbdo, "/devices/" + DEVICE_ID + "/status", status)) {
       Serial.println("Berhasil mengirim status ke Firebase");
     } else {
       Serial.print("Gagal mengirim status: ");
@@ -146,7 +149,7 @@ void loop() {
     }
 
     // Kirim detak jantung timestamp ke Firebase RTDB (untuk deteksi online/offline di aplikasi Android)
-    if (Firebase.RTDB.setTimestamp(&fbdo, "/turbidity/last_seen")) {
+    if (Firebase.RTDB.setTimestamp(&fbdo, "/devices/" + DEVICE_ID + "/last_seen")) {
       Serial.println("Berhasil mengirim detak jantung (last_seen)");
     }
 
