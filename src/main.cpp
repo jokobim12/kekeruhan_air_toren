@@ -30,6 +30,7 @@ const long checkSettingsInterval = 10000; // Cek pengaturan setiap 10 detik
 // Batas ambang default (bisa berubah dinamis dari Firebase)
 int cleanThreshold = 1900;
 int cloudyThreshold = 1850;
+int dirtyThreshold = 1000;
 
 void setup() {
   Serial.begin(115200);
@@ -91,8 +92,19 @@ void loop() {
       Firebase.RTDB.setInt(&fbdo, "/turbidity/thresholds/cloudy", cloudyThreshold);
     }
 
+    // 3b. Baca threshold kotor
+    int tempDirty = 0;
+    if (Firebase.RTDB.getInt(&fbdo, "/turbidity/thresholds/dirty", &tempDirty)) {
+      dirtyThreshold = tempDirty;
+      Serial.print("Batas KOTOR diperbarui: ");
+      Serial.println(dirtyThreshold);
+    } else {
+      // Tulis default jika belum ada di database
+      Firebase.RTDB.setInt(&fbdo, "/turbidity/thresholds/dirty", dirtyThreshold);
+    }
+
     // 4. Kirim Wi-Fi SSID saat ini ke Firebase agar terbaca di halaman Profil Android
-    Firebase.RTDB.setString(&fbdo, "/turbidity/status/wifi_ssid", WiFi.SSID());
+    Firebase.RTDB.setString(&fbdo, "/turbidity/wifi_ssid", WiFi.SSID());
   }
 
   // Kirim data setiap interval yang ditentukan
@@ -106,8 +118,10 @@ void loop() {
       status = "BERSIH";
     } else if (sensorValue > cloudyThreshold) {
       status = "KERUH";
-    } else {
+    } else if (sensorValue > dirtyThreshold) {
       status = "KOTOR";
+    } else {
+      status = "SANGAT KOTOR";
     }
 
     Serial.print("Nilai Sensor: ");
@@ -129,6 +143,11 @@ void loop() {
     } else {
       Serial.print("Gagal mengirim status: ");
       Serial.println(fbdo.errorReason());
+    }
+
+    // Kirim detak jantung timestamp ke Firebase RTDB (untuk deteksi online/offline di aplikasi Android)
+    if (Firebase.RTDB.setTimestamp(&fbdo, "/turbidity/last_seen")) {
+      Serial.println("Berhasil mengirim detak jantung (last_seen)");
     }
 
     Serial.println("----------------");
