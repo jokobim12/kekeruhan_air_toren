@@ -25,7 +25,7 @@ FirebaseConfig config;
 unsigned long sendDataPrevMillis = 0;
 unsigned long sendInterval = 5000; // Default 5 detik (bisa berubah dinamis)
 unsigned long checkSettingsPrevMillis = 0;
-const long checkSettingsInterval = 10000; // Cek pengaturan setiap 10 detik
+const long checkSettingsInterval = 20000; // Cek pengaturan setiap 20 detik agar tidak membebani loop
 
 // Batas ambang default (bisa berubah dinamis dari Firebase)
 int cleanThreshold = 1900;
@@ -77,34 +77,28 @@ void loop() {
     int tempClean = 0;
     if (Firebase.RTDB.getInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/clean", &tempClean)) {
       cleanThreshold = tempClean;
-      Serial.print("Batas BERSIH diperbarui: ");
-      Serial.println(cleanThreshold);
     } else {
-      // Tulis default jika belum ada di database
-      Firebase.RTDB.setInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/clean", cleanThreshold);
+      Firebase.RTDB.setIntAsync(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/clean", cleanThreshold);
     }
 
     // 3. Baca threshold keruh
     int tempCloudy = 0;
     if (Firebase.RTDB.getInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/cloudy", &tempCloudy)) {
       cloudyThreshold = tempCloudy;
-      Serial.print("Batas KERUH diperbarui: ");
-      Serial.println(cloudyThreshold);
     } else {
-      // Tulis default jika belum ada di database
-      Firebase.RTDB.setInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/cloudy", cloudyThreshold);
+      Firebase.RTDB.setIntAsync(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/cloudy", cloudyThreshold);
     }
 
     // 3b. Baca threshold kotor
     int tempDirty = 0;
     if (Firebase.RTDB.getInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/dirty", &tempDirty)) {
       dirtyThreshold = tempDirty;
-      Serial.print("Batas KOTOR diperbarui: ");
-      Serial.println(dirtyThreshold);
     } else {
-      // Tulis default jika belum ada di database
-      Firebase.RTDB.setInt(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/dirty", dirtyThreshold);
+      Firebase.RTDB.setIntAsync(&fbdo, "/devices/" + DEVICE_ID + "/thresholds/dirty", dirtyThreshold);
     }
+    
+    // Clear buffer memory agar ESP32 tidak hang/freeze
+    fbdo.clear();
 
     // 4. Kirim Wi-Fi SSID saat ini ke Firebase agar terbaca di halaman Profil Android
     Firebase.RTDB.setString(&fbdo, "/devices/" + DEVICE_ID + "/wifi_ssid", WiFi.SSID());
@@ -132,26 +126,16 @@ void loop() {
     Serial.print("Status: ");
     Serial.println(status);
 
-    // Kirim data nilai sensor ke Firebase RTDB
-    if (Firebase.RTDB.setInt(&fbdo, "/devices/" + DEVICE_ID + "/value", sensorValue)) {
-      Serial.println("Berhasil mengirim nilai sensor ke Firebase");
-    } else {
-      Serial.print("Gagal mengirim nilai sensor: ");
-      Serial.println(fbdo.errorReason());
-    }
+    // MENGGUNAKAN ASYNC NON-BLOCKING:
+    // Metode ini mengantrekan request di background tanpa membekukan loop() sama sekali!
+    Firebase.RTDB.setIntAsync(&fbdo, "/devices/" + DEVICE_ID + "/value", sensorValue);
+    Firebase.RTDB.setStringAsync(&fbdo, "/devices/" + DEVICE_ID + "/status", status);
+    Firebase.RTDB.setIntAsync(&fbdo, "/devices/" + DEVICE_ID + "/last_seen", (int)millis());
 
-    // Kirim data status ke Firebase RTDB
-    if (Firebase.RTDB.setString(&fbdo, "/devices/" + DEVICE_ID + "/status", status)) {
-      Serial.println("Berhasil mengirim status ke Firebase");
-    } else {
-      Serial.print("Gagal mengirim status: ");
-      Serial.println(fbdo.errorReason());
-    }
-
-    // Kirim detak jantung timestamp ke Firebase RTDB (untuk deteksi online/offline di aplikasi Android)
-    if (Firebase.RTDB.setTimestamp(&fbdo, "/devices/" + DEVICE_ID + "/last_seen")) {
-      Serial.println("Berhasil mengirim detak jantung (last_seen)");
-    }
+    Serial.println("Berhasil mengirim data sensor (Mode Async / Tanpa Delay)");
+    
+    // Bebaskan memory buffer
+    fbdo.clear();
 
     Serial.println("----------------");
   }
